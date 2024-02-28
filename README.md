@@ -1,6 +1,3 @@
-# MIL-VT
-
-Code for MICCAI 2021 accepted paper: MIL-VT: Multiple Instance Learning Enhanced Vision Transformer for Fundus Image Classification
 
 ### Basic Requirement:
 * timm==0.3.2
