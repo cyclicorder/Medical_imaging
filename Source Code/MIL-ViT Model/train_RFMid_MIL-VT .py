@@ -13,7 +13,7 @@ from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 
 import utils
-from data_manager.dataset import dataset_Aptos
+from data_manager.dataset import dataset_RFMiD
 from loss.MultiClassMetrics import *
 from models.FinetuneVTmodels import MIL_VT_FineTune
 from utils import *
@@ -23,9 +23,9 @@ from models.MIL_VT import *
 def main():
 
     """Basic Setting"""
-    data_path = r'data/APTOS/Image/'
-    csv_path = r'data/APTOS/CSV/'
-    save_model_path = r'data/APTOS/PytorchModel/'
+    data_path = r'data/RFMID/Image/'
+    csv_path = r'data/RFMID/CSV/'
+    save_model_path = r'data/RFMID/PytorchModel/'
     csvName = csv_path + 'train.csv'  ##the csv file store the path of image and corresponding label
 
     gpu_ids = [0, 1]
@@ -36,7 +36,7 @@ def main():
     batch_size = 16
     img_size = 384
     initialLR = 2e-5
-    n_classes = 5
+    n_classes = 2
 
     balanceFlag = True  #balanceFlag is set to True to balance the sampling of different classes
     debugFlag = False  #Debug flag is set to True to train on a small dataset
@@ -125,9 +125,9 @@ def main():
 
     print('Train: ', len(DF_train), 'Val: ', len(DF_val), 'Test: ', len(DF_test))
     for tempLabel in [0,1,2,3,4]:
-        print(tempLabel, np.sum(DF_train['diagnosis']==tempLabel),\
-                        np.sum(DF_val['diagnosis']==tempLabel),
-                        np.sum(DF_test['diagnosis']==tempLabel))
+        print(tempLabel, np.sum(DF_train['Disease_Risk']==tempLabel),\
+                        np.sum(DF_val['Disease_Risk']==tempLabel),
+                        np.sum(DF_test['Disease_Risk']==tempLabel))
 
     #################################################
 
@@ -148,9 +148,9 @@ def main():
         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
     ])
 
-    dataset_train = dataset_Aptos(data_path, DF_train, transform = transform_train)
-    dataset_valid = dataset_Aptos(data_path, DF_val, transform = transform_test)
-    dataset_test = dataset_Aptos(data_path, DF_test, transform=transform_test)
+    dataset_train = dataset_RFMiD(data_path, DF_train, transform = transform_train)
+    dataset_valid = dataset_RFMiD(data_path, DF_val, transform = transform_test)
+    dataset_test = dataset_RFMiD(data_path, DF_test, transform=transform_test)
 
     """assign sample weight to deal with the unblanced classes"""
     weights = make_weights_for_balanced_classes(DF_train, n_classes)                                                           
@@ -243,7 +243,7 @@ def train(epoch, model, criterion, optimizer, train_loader, max_epoch,  tbWriter
 
     predictions_class = []
     total = 0
-    for batch_idx, (inputs, labels_multiclass, labels_onehot) in enumerate(train_loader):
+    for batch_idx, (inputs, labels_multiclass) in enumerate(train_loader):
         inputs = inputs.cuda()
         targets_class = labels_multiclass.cuda()
         # # print(targets_class)
@@ -276,7 +276,7 @@ def train(epoch, model, criterion, optimizer, train_loader, max_epoch,  tbWriter
 
         outputs_class = utils.softmax(outputs_class.data.cpu().numpy())
         ground_truths_multiclass.extend(labels_multiclass.data.cpu().numpy())
-        ground_truths_multilabel.extend(labels_onehot.data.cpu().numpy())
+        #ground_truths_multilabel.extend(labels_onehot.data.cpu().numpy()) #For, APTOS
         predictions_class.extend(outputs_class)
 
     """Mesure the prediction performance on train set"""
@@ -299,6 +299,8 @@ def train(epoch, model, criterion, optimizer, train_loader, max_epoch,  tbWriter
     tbWriter.add_scalar('wF1/train', wF1, epoch)
     tbWriter.add_scalar('wKapa/train', wKappa, epoch)
     tbWriter.add_scalar('Loss/train', losses.avg, epoch)
+    tbWriter.add_scalar('vit_loss_L1/train', losses1, epoch)
+    tbWriter.add_scalar('mil_loss_L2/train', losses2, epoch)
 
 
     end_time = time.time()
@@ -320,7 +322,7 @@ def val(epoch, model, criterion, val_loader, max_epoch, tbWriter):
     scores = []
     total = 0
 
-    for batch_idx, (inputs,  labels_multiclass, labels_onehot) in enumerate(val_loader):
+    for batch_idx, (inputs,  labels_multiclass) in enumerate(val_loader):
         inputs = Variable(inputs.cuda())
         targets_class = Variable(labels_multiclass.cuda())
 
@@ -331,7 +333,7 @@ def val(epoch, model, criterion, val_loader, max_epoch, tbWriter):
 
         outputs_class = utils.softmax(outputs_class.data.cpu().numpy())
         ground_truths_multiclass.extend(labels_multiclass.data.cpu().numpy())
-        ground_truths_multilabel.extend(labels_onehot.data.cpu().numpy())
+        #ground_truths_multilabel.extend(labels_onehot.data.cpu().numpy())
         predictions_class.extend(outputs_class)
 
         total += targets_class.size(0)
@@ -378,7 +380,7 @@ def test(epoch, model, criterion, test_loader,  tbWriter):
     predictions_class = []
     total = 0
 
-    for batch_idx, (inputs, labels_multiclass, labels_onehot) in enumerate(test_loader):
+    for batch_idx, (inputs, labels_multiclass) in enumerate(test_loader):
         inputs = Variable(inputs.cuda())
         targets_class = Variable(labels_multiclass.cuda())
 
@@ -389,7 +391,7 @@ def test(epoch, model, criterion, test_loader,  tbWriter):
 
         outputs_class = utils.softmax(outputs_class.data.cpu().numpy())
         ground_truths_multiclass.extend(labels_multiclass.data.cpu().numpy())
-        ground_truths_multilabel.extend(labels_onehot.data.cpu().numpy())
+        #ground_truths_multilabel.extend(labels_onehot.data.cpu().numpy())
         predictions_class.extend(outputs_class)
         total += targets_class.size(0)
 
